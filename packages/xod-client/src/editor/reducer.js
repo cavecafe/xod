@@ -11,6 +11,7 @@ import { DEFAULT_PANNING_OFFSET } from '../project/nodeLayout';
 import { MAIN_PATCH_PATH } from '../project/constants';
 import {
   DEBUGGER_TAB_ID,
+  TABLE_LOG_TAB_ID,
   FOCUS_AREAS,
   SELECTION_ENTITY_TYPE,
   TAB_TYPES,
@@ -130,33 +131,50 @@ const setPropsToTab = R.curry((id, props, state) =>
   )(state)
 );
 
-const addTabWithProps = R.curry((id, type, patchPath, state) => {
+const getTabNewIndex = state => {
   const tabs = R.prop('tabs')(state);
   const lastIndex = R.reduce(
     (acc, tab) => R.pipe(R.prop('index'), R.max(acc))(tab),
     -1,
     R.values(tabs)
   );
-  const newIndex = R.inc(lastIndex);
+  return R.inc(lastIndex);
+};
 
-  return setPropsToTab(
+const addTabWithProps = R.curry((id, type, patchPath, state) =>
+  setPropsToTab(
     id,
     {
       id,
       patchPath,
-      index: newIndex,
+      index: getTabNewIndex(state),
       type,
       offset: DEFAULT_PANNING_OFFSET,
       editedAttachment: null,
     },
     state
-  );
-});
+  )
+);
 
 const addPatchTab = R.curry((newId, patchPath, state) => {
   if (!patchPath) return state;
   return addTabWithProps(newId, TAB_TYPES.PATCH, patchPath, state);
 });
+
+const addTableLogTab = R.curry((nodeId, activeSheetIndex, state) =>
+  setPropsToTab(
+    TABLE_LOG_TAB_ID,
+    {
+      id: TABLE_LOG_TAB_ID,
+      index: getTabNewIndex(state),
+      type: TAB_TYPES.TABLE_LOG,
+      nodeId,
+      activeSheetIndex,
+      // offset: { x: 0, y: 0, }, // TODO: Why do we need it?! :-(
+    },
+    state
+  )
+);
 
 const applyTabSort = (tab, payload) => {
   if (R.not(R.has(tab.id, payload))) {
@@ -711,6 +729,20 @@ const editorReducer = (state = initialState, action) => {
         R.lensProp('pointingPopups'),
         R.assoc('colorPickerWidget', null)
       )(state);
+    case EAT.OPEN_TABLE_LOG_TAB:
+      return R.compose(
+        R.assoc('currentTabId', TABLE_LOG_TAB_ID),
+        addTableLogTab(action.payload.nodeId, action.payload.activeSheetIndex)
+      )(state);
+    case EAT.CHANGE_TABLE_LOG_SHEET:
+      return setPropsToTab(
+        action.payload.tabId,
+        {
+          nodeId: action.payload.nodeId,
+          activeSheetIndex: action.payload.newSheetIndex,
+        },
+        state
+      );
 
     default:
       return state;
