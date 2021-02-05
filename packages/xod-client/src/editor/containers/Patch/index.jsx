@@ -331,6 +331,7 @@ Patch.propTypes = {
   isDebugSession: PropTypes.bool,
   isPatchDraggedOver: PropTypes.bool,
   nodeValues: PropTypes.objectOf(PropTypes.string),
+  chunks: PropTypes.arrayOf(PropTypes.object),
   /* eslint-enable react/no-unused-prop-types */
 };
 
@@ -346,6 +347,7 @@ const mapStateToProps = R.applySpec({
   draggedPreviewSize: EditorSelectors.getDraggedPreviewSize,
   isDebugSession: DebugSelectors.isDebugSession,
   nodeValues: DebugSelectors.getInteractiveNodeValuesForCurrentPatch,
+  chunks: EditorSelectors.getRenerableBreadcrumbChunks,
 });
 
 const mapDispatchToProps = dispatch => ({
