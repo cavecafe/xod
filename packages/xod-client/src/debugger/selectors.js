@@ -1,5 +1,6 @@
 import * as R from 'ramda';
 import { Maybe } from 'ramda-fantasy';
+import * as XP from 'xod-project';
 import { foldMaybe, isAmong, memoizeOnlyLast } from 'xod-func-tools';
 import { createSelector } from 'reselect';
 import {
@@ -308,7 +309,50 @@ export const getTableLogValues = R.compose(
   getDebuggerState
 );
 
-export const getTableLogSources = R.compose(R.keys, getTableLogValues);
+const getTableLogSourcesRaw = R.compose(
+  R.prop('tableLogSources'),
+  getDebuggerState
+);
+
+// :: State -> [{ nodeId: NodeId, label: String }]
+export const getTableLogSources = state =>
+  R.compose(
+    R.unnest,
+    R.values,
+    R.mapObjIndexed((nodeIds, rootPatchPath) =>
+      R.map(nodeId =>
+        R.compose(
+          foldMaybe(
+            {
+              nodeId,
+              label: `DELETED (${nodeId})`,
+            },
+            R.applySpec({
+              nodeId: R.always(nodeId),
+              label: R.join(' > '),
+            })
+          ),
+          XP.mapNestedNodes(
+            node => {
+              const nodeType = XP.getNodeType(node);
+              const label = XP.getNodeLabel(node);
+              const curNodeId = XP.getNodeId(node);
+              // eslint-disable-next-line no-nested-ternary
+              return label.length
+                ? label
+                : nodeType === XP.TABLELOG_NODETYPE
+                  ? 'table-log'
+                  : `UNLABELED (${curNodeId})`;
+            },
+            R.prop('project', state), // Circular dependencies prevents using of `getProject` selector
+            rootPatchPath
+          ),
+          R.split('~') // Convert chained NodeId (`a~b~c`) into [NodeId] (['a', 'b', 'c'])
+        )(nodeId)
+      )(nodeIds)
+    ),
+    getTableLogSourcesRaw
+  )(state);
 
 export const getTableLogsByNodeId = R.curry((nodeId, state) =>
   R.compose(R.pathOr([], ['tableLogValues', nodeId]), getDebuggerState)(state)
